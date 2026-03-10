@@ -1,34 +1,43 @@
 import DocumentList from '../documents/DocumentList.jsx';
 
-function Sidebar({ documents, onCreate, newTitle, setNewTitle, loading }) {
-
+function Sidebar({ documents, loading, onCreate, collapsed = false }) {
   return (
-    <aside className="flex h-full w-72 flex-col border-r border-borderSubtle bg-sidebar">
-      <div className="px-4 pb-3 pt-4">
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-          Documents
-        </h2>
+    <aside
+      className={`flex shrink-0 flex-col border-r border-[var(--line)] bg-[var(--sidebar-bg)] transition-all duration-200 ${
+        collapsed ? 'w-0 min-w-0 overflow-hidden border-r-0 opacity-0' : 'w-[240px] min-w-[240px] opacity-100'
+      }`}
+    >
+      {/* Header */}
+      <div className="px-5 pt-5 pb-3">
+        <h2 className="text-[15px] font-semibold text-[var(--ink)]">Documents</h2>
+      </div>
+
+      {/* New Document button */}
+      <div className="px-4 pb-4">
         <button
           type="button"
           onClick={onCreate}
-          disabled={loading || !newTitle.trim()}
-          className="mb-3 inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-indigo-300"
+          disabled={loading}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--accent)] px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-50"
         >
-          + Create New Document
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M7 2.5v9M2.5 7h9" />
+          </svg>
+          New Document
         </button>
-        <div className="flex items-center gap-2 rounded-md bg-white px-3 py-2 shadow-sm">
-          <input
-            type="text"
-            placeholder="New document title"
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            className="w-full border-none bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0"
-          />
-        </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-2 pb-4">
-        <DocumentList documents={documents} />
+      {/* Document list */}
+      <nav className="flex-1 overflow-y-auto px-3 pb-3">
+        {loading ? (
+          <div className="space-y-1 px-1 pt-1">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-9 animate-pulse rounded-lg bg-[var(--hover)]" />
+            ))}
+          </div>
+        ) : (
+          <DocumentList documents={documents} />
+        )}
       </nav>
     </aside>
   );

@@ -3,21 +3,30 @@ import { Link, useLocation } from 'react-router-dom';
 function DocumentList({ documents }) {
   const location = useLocation();
 
+  if (!documents.length) {
+    return (
+      <div className="px-2 py-8 text-center text-[13px] text-[var(--muted)]">
+        No documents yet
+      </div>
+    );
+  }
+
   return (
-    <ul className="space-y-1">
+    <ul className="space-y-0.5">
       {documents.map((doc) => {
         const isActive = location.pathname === `/documents/${doc.id}`;
         return (
           <li key={doc.id}>
             <Link
               to={`/documents/${doc.id}`}
-              className={`flex items-center justify-between rounded-md px-3 py-2 text-sm ${
+              className={`block truncate rounded-lg px-3 py-2 text-[14px] transition-colors ${
                 isActive
-                  ? 'bg-white font-medium text-gray-900 shadow-sm'
-                  : 'text-gray-700 hover:bg-white hover:text-gray-900'
+                  ? 'bg-[var(--active)] font-medium text-[var(--ink)]'
+                  : 'text-[var(--ink)] hover:bg-[var(--hover)]'
               }`}
+              title={doc.title}
             >
-              <span className="truncate">{doc.title}</span>
+              {doc.title}
             </Link>
           </li>
         );

@@ -4,7 +4,7 @@ import DocumentEditorPage from './pages/DocumentEditorPage.jsx';
 
 function App() {
   return (
-    <div className="flex h-screen flex-col bg-slate-100">
+    <div className="h-screen overflow-hidden">
       <Routes>
         <Route path="/" element={<DocumentListPage />} />
         <Route path="/documents/:id" element={<DocumentEditorPage />} />

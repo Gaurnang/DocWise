@@ -1,7 +1,7 @@
 function EditorContainer({ children }) {
   return (
-    <div className="flex flex-1 justify-center bg-slate-100 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="flex w-full max-w-4xl flex-col rounded-lg border border-borderSubtle bg-canvas shadow-sm">
+    <div className="flex flex-1 justify-center overflow-y-auto bg-[var(--editor-bg)] px-8 py-12">
+      <div className="w-full max-w-[720px]">
         {children}
       </div>
     </div>
