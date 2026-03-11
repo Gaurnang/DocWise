@@ -5,6 +5,7 @@ import * as Y from 'yjs';
 import Navbar from '../components/layout/Navbar.jsx';
 import Sidebar from '../components/layout/Sidebar.jsx';
 import EditorContainer from '../components/editor/EditorContainer.jsx';
+import EditorToolbar from '../components/editor/EditorToolbar.jsx';
 
 const API_BASE = 'http://localhost:4000';
 
@@ -22,6 +23,8 @@ function DocumentEditorPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [wordCount, setWordCount] = useState(0);
+  const [charCount, setCharCount] = useState(0);
 
   useEffect(() => {
     async function fetchDocuments() {
@@ -48,6 +51,7 @@ function DocumentEditorPage() {
         const doc = await res.json();
         setTitle(doc.title);
         setContent(doc.content);
+        updateStats(doc.content);
       } catch (err) {
         console.error(err);
         setError('Failed to load document');
@@ -59,6 +63,11 @@ function DocumentEditorPage() {
     fetchDocuments();
     fetchDocument();
   }, [id]);
+
+  const updateStats = (text) => {
+    setCharCount(text.length);
+    setWordCount(text.trim().split(/\s+/).filter(w => w.length > 0).length);
+  };
 
   async function handleCreateDocument() {
     try {
@@ -77,7 +86,7 @@ function DocumentEditorPage() {
     }
   }
 
-  // --- Yjs + Socket.IO collaboration (unchanged logic) ---
+  // --- Yjs + Socket.IO collaboration ---
   useEffect(() => {
     const ydoc = new Y.Doc();
     ydocRef.current = ydoc;
@@ -92,7 +101,9 @@ function DocumentEditorPage() {
     });
 
     ytext.observe(() => {
-      setContent(ytext.toString());
+      const newContent = ytext.toString();
+      setContent(newContent);
+      updateStats(newContent);
     });
 
     socket.on('connect', () => {
@@ -181,10 +192,15 @@ function DocumentEditorPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-[var(--bg)]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--accent)]" />
-          <span className="text-sm text-[var(--muted)]">Loading document...</span>
+      <div className="flex h-screen flex-col bg-white">
+        <Navbar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+        <div className="flex flex-1 items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="inline-flex items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-300 border-t-blue-600" />
+            </div>
+            <span className="text-sm text-slate-500">Loading document...</span>
+          </div>
         </div>
       </div>
     );
@@ -192,28 +208,35 @@ function DocumentEditorPage() {
 
   if (error && !content && !title) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 bg-[var(--bg)]">
-        <div className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-6 py-5 text-center shadow-sm">
-          <p className="text-sm text-[var(--red)]">{error}</p>
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="mt-4 rounded-md bg-[var(--hover)] px-4 py-2 text-sm text-[var(--ink)] transition-colors hover:bg-[var(--active)]"
-          >
-            Back to documents
-          </button>
+      <div className="flex h-screen flex-col bg-white">
+        <Navbar onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+        <div className="flex flex-1 items-center justify-center">
+          <div className="rounded-xl border border-red-200 bg-red-50 px-8 py-8 text-center shadow-sm max-w-sm">
+            <div className="text-4xl mb-4">⚠️</div>
+            <p className="text-base font-medium text-red-900 mb-2">Document not found</p>
+            <p className="text-sm text-red-700 mb-6">{error}</p>
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="btn btn-primary w-full"
+            >
+              Back to documents
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col bg-[var(--bg)]">
+    <div className="flex h-screen flex-col bg-white overflow-hidden">
       <Navbar
+        title={title || 'Untitled'}
         saveStatus={saveStatus}
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
       />
-      <div className="flex min-h-0 flex-1">
+      
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         <Sidebar
           documents={documents}
           onCreate={handleCreateDocument}
@@ -221,43 +244,74 @@ function DocumentEditorPage() {
           collapsed={!sidebarOpen}
         />
 
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-          {/* Editor area */}
+        {/* Main editor content */}
+        <main className="flex flex-1 flex-col min-h-0 overflow-hidden">
           <EditorContainer>
-            {/* Title input */}
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => handleTitleChange(e.target.value)}
-              className="w-full border-none bg-transparent pt-16 pb-3 text-[42px] font-[800] leading-[1.2] tracking-[-0.02em] text-[var(--ink)] placeholder:text-[var(--muted)] focus:outline-none"
-              placeholder="Untitled"
-            />
+            {/* Toolbar */}
+            <EditorToolbar />
+            
+            {/* Editor content */}
+            <div className="flex-1 flex flex-col overflow-y-auto">
+              {/* Title input */}
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => handleTitleChange(e.target.value)}
+                className="px-8 pt-12 pb-2 text-5xl font-display font-bold leading-tight text-slate-900 placeholder-slate-300 focus:outline-none bg-transparent"
+                placeholder="Untitled Document"
+              />
 
-            {/* Content textarea */}
-            <textarea
-              value={content}
-              onChange={(e) => {
-                const next = e.target.value;
-                const ydoc = ydocRef.current;
-                if (ydoc) {
-                  const ytext = ydoc.getText('content');
-                  ydoc.transact(() => {
-                    if (ytext.length > 0) ytext.delete(0, ytext.length);
-                    ytext.insert(0, next);
-                  }, 'local');
-                } else {
-                  setContent(next);
-                  if (socketRef.current) {
-                    socketRef.current.emit('doc_update', {
-                      documentId: id,
-                      content: next,
-                    });
+              {/* Subtitle with stats */}
+              <div className="px-8 pb-8 flex items-center gap-4 text-sm text-slate-500 border-b border-slate-200">
+                <span>📝 {wordCount} words</span>
+                <span>•</span>
+                <span>🔤 {charCount} characters</span>
+              </div>
+
+              {/* Content textarea */}
+              <textarea
+                value={content}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  updateStats(next);
+                  const ydoc = ydocRef.current;
+                  if (ydoc) {
+                    const ytext = ydoc.getText('content');
+                    ydoc.transact(() => {
+                      if (ytext.length > 0) ytext.delete(0, ytext.length);
+                      ytext.insert(0, next);
+                    }, 'local');
+                  } else {
+                    setContent(next);
+                    if (socketRef.current) {
+                      socketRef.current.emit('doc_update', {
+                        documentId: id,
+                        content: next,
+                      });
+                    }
                   }
-                }
-              }}
-              className="mt-6 min-h-[60vh] w-full resize-none border-none bg-transparent text-[16px] leading-[1.85] text-[var(--ink)] placeholder:text-[var(--muted)] focus:outline-none"
-              placeholder="Start writing..."
-            />
+                }}
+                className="flex-1 px-8 py-6 w-full resize-none border-none bg-transparent text-lg leading-relaxed text-slate-900 placeholder-slate-400 focus:outline-none"
+                placeholder="Start typing your document... Begin your creative journey here!"
+                spellCheck="true"
+              />
+
+              {/* Footer stats */}
+              <div className="px-8 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+                <div className="flex items-center gap-4">
+                  <span>Last saved moments ago</span>
+                  <span>•</span>
+                  <span>Editing as You</span>
+                </div>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 font-medium transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
           </EditorContainer>
         </main>
       </div>
