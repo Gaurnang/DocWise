@@ -92,6 +92,24 @@ app.put('/api/documents/:id', async (req, res) => {
   res.json(doc);
 });
 
+app.delete('/api/documents/:id', async (req, res) => {
+  const { id } = req.params;
+  const index = documents.findIndex((d) => d.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: 'Document not found' });
+  }
+
+  documents.splice(index, 1);
+
+  try {
+    await fileStorage.deleteSnapshot(id);
+  } catch (error) {
+    console.error('Failed to delete persisted document file:', error);
+  }
+
+  res.json({ success: true });
+});
+
 const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {

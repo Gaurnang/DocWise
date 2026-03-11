@@ -173,6 +173,19 @@ function DocumentEditorPage() {
     }
   }
 
+  async function handleDelete() {
+    try {
+      const res = await fetch(`${API_BASE}/api/documents/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Delete failed');
+      navigate('/');
+    } catch (err) {
+      console.error(err);
+      setError('Failed to delete document');
+    }
+  }
+
   function handleTitleChange(nextTitle) {
     setTitle(nextTitle);
     setDocuments((prev) =>
@@ -248,7 +261,7 @@ function DocumentEditorPage() {
         <main className="flex flex-1 flex-col min-h-0 overflow-hidden">
           <EditorContainer>
             {/* Toolbar */}
-            <EditorToolbar />
+            <EditorToolbar onDelete={handleDelete} />
             
             {/* Editor content */}
             <div className="flex-1 flex flex-col overflow-y-auto">
