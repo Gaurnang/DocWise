@@ -65,7 +65,7 @@ function DocumentEditorPage() {
   }, [id]);
 
   const updateStats = (text) => {
-    setCharCount(text.length);
+    setCharCount((text.match(/[^\s]/g) || []).length);
     setWordCount(text.trim().split(/\s+/).filter(w => w.length > 0).length);
   };
 
@@ -258,24 +258,24 @@ function DocumentEditorPage() {
         />
 
         {/* Main editor content */}
-        <main className="flex flex-1 flex-col min-h-0 overflow-hidden">
+        <main className="flex flex-1 flex-col min-h-0 overflow-hidden border-l border-slate-200">
           <EditorContainer>
             {/* Toolbar */}
             <EditorToolbar onDelete={handleDelete} />
             
             {/* Editor content */}
-            <div className="flex-1 flex flex-col overflow-y-auto">
+            <div className="flex-1 flex flex-col overflow-y-auto min-h-0">
               {/* Title input */}
               <input
                 type="text"
                 value={title}
                 onChange={(e) => handleTitleChange(e.target.value)}
-                className="px-8 pt-12 pb-2 text-5xl font-display font-bold leading-tight text-slate-900 placeholder-slate-300 focus:outline-none bg-transparent"
+                className="px-10 pt-10 pb-2 text-4xl font-display font-bold leading-tight text-slate-900 placeholder-slate-300 focus:outline-none bg-transparent"
                 placeholder="Untitled Document"
               />
 
               {/* Subtitle with stats */}
-              <div className="px-8 pb-8 flex items-center gap-4 text-sm text-slate-500 border-b border-slate-200">
+              <div className="px-10 pb-6 flex items-center gap-4 text-sm text-slate-500 border-b border-slate-200">
                 <span>📝 {wordCount} words</span>
                 <span>•</span>
                 <span>🔤 {charCount} characters</span>
@@ -284,6 +284,7 @@ function DocumentEditorPage() {
               {/* Content textarea */}
               <textarea
                 value={content}
+                style={{ minHeight: '65vh' }}
                 onChange={(e) => {
                   const next = e.target.value;
                   updateStats(next);
@@ -304,13 +305,13 @@ function DocumentEditorPage() {
                     }
                   }
                 }}
-                className="flex-1 px-8 py-6 w-full resize-none border-none bg-transparent text-lg leading-relaxed text-slate-900 placeholder-slate-400 focus:outline-none"
+                className="flex-1 px-10 py-6 w-full resize-none border-none bg-transparent text-lg leading-relaxed text-slate-900 placeholder-slate-400 focus:outline-none"
                 placeholder="Start typing your document... Begin your creative journey here!"
                 spellCheck="true"
               />
 
               {/* Footer stats */}
-              <div className="px-8 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+              <div className="sticky bottom-0 px-8 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
                 <div className="flex items-center gap-4">
                   <span>Last saved moments ago</span>
                   <span>•</span>
