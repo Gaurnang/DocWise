@@ -110,6 +110,60 @@ app.delete('/api/documents/:id', async (req, res) => {
   res.json({ success: true });
 });
 
+let users = [];
+
+app.post('/api/auth/signup', (req, res) => {
+  const { email, password, name } = req.body;
+
+  if (!email || !password || !name) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  const userExists = users.find(u => u.email === email);
+  if (userExists) {
+    return res.status(409).json({ error: 'Email already exists' });
+  }
+
+  const newUser = {
+    id: String(Date.now()),
+    email,
+    password,
+    name,
+  };
+
+  users.push(newUser);
+
+  const token = Buffer.from(JSON.stringify({ id: newUser.id, email: newUser.email })).toString('base64');
+
+  res.status(201).json({
+    success: true,
+    token,
+    user: { id: newUser.id, email: newUser.email, name: newUser.name }
+  });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password required' });
+  }
+
+  const user = users.find(u => u.email === email && u.password === password);
+
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid email or password' });
+  }
+
+  const token = Buffer.from(JSON.stringify({ id: user.id, email: user.email })).toString('base64');
+
+  res.json({
+    success: true,
+    token,
+    user: { id: user.id, email: user.email, name: user.name }
+  });
+});
+
 const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
