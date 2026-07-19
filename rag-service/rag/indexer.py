@@ -5,16 +5,18 @@ from typing import Any
 from dotenv import load_dotenv
 from langchain_core.documents import Document
 from langchain_community.vectorstores import Chroma
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
-load_dotenv()
+from pathlib import Path
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 CHROMA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "chroma_db")
 COLLECTION_NAME = "documents"
 EMBEDDING_MODEL = "gemini-embedding-001"
 EMBEDDING_DIMENSION = 768
+CHAT_MODEL = "gemini-flash-latest"
 
 
 class LoggingGoogleGenerativeAIEmbeddings(GoogleGenerativeAIEmbeddings):
@@ -63,6 +65,18 @@ def get_vector_store() -> Chroma:
         collection_name=COLLECTION_NAME,
         embedding_function=get_embeddings(),
         persist_directory=CHROMA_DIR,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_chat_model() -> ChatGoogleGenerativeAI:
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is not set")
+
+    return ChatGoogleGenerativeAI(
+        model=CHAT_MODEL,
+        
     )
 
 
