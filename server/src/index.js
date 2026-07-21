@@ -46,6 +46,74 @@ app.get('/api/documents/:id', async (req, res) => {
   }
 });
 
+const RAG_SERVICE_URL = 'http://localhost:8001';
+
+app.post('/api/documents/:id/summarize', async (req, res) => {
+  const { id } = req.params;
+  const doc = documents.find((d) => d.id === id);
+  if (!doc) {
+    return res.status(404).json({ error: 'Document not found' });
+  }
+
+  try {
+    const text = await documentManager.getText(id, doc.content);
+
+    const ragResponse = await fetch(`${RAG_SERVICE_URL}/summarize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document_id: id, text }),
+    });
+
+    const data = await ragResponse.json();
+
+    if (!ragResponse.ok) {
+      console.error('RAG service returned an error for /summarize:', data);
+      return res.status(502).json({ error: 'Summarization service failed', detail: data });
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error('Failed to reach RAG service for /summarize:', error);
+    res.status(500).json({ error: 'Could not reach summarization service' });
+  }
+});
+
+app.post('/api/documents/:id/qna', async (req, res) => {
+  const { id } = req.params;
+  const { question } = req.body;
+
+  if (!question) {
+    return res.status(400).json({ error: 'Question is required' });
+  }
+
+  const doc = documents.find((d) => d.id === id);
+  if (!doc) {
+    return res.status(404).json({ error: 'Document not found' });
+  }
+
+  try {
+    const text = await documentManager.getText(id, doc.content);
+
+    const ragResponse = await fetch(`${RAG_SERVICE_URL}/qna`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ document_id: id, text, question }),
+    });
+
+    const data = await ragResponse.json();
+
+    if (!ragResponse.ok) {
+      console.error('RAG service returned an error for /qna:', data);
+      return res.status(502).json({ error: 'Q&A service failed', detail: data });
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error('Failed to reach RAG service for /qna:', error);
+    res.status(500).json({ error: 'Could not reach Q&A service' });
+  }
+});
+
 app.post('/api/documents', async (req, res) => {
   const { title, content } = req.body;
   if (!title) {
@@ -247,4 +315,3 @@ io.on('connection', (socket) => {
 httpServer.listen(PORT, () => {
   console.log(`Server with Socket.io listening on http://localhost:${PORT}`);
 });
-
