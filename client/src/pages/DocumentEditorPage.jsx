@@ -261,7 +261,7 @@ function DocumentEditorPage() {
         <main className="flex flex-1 flex-col min-h-0 overflow-hidden border-l border-slate-200">
           <EditorContainer>
             {/* Toolbar */}
-            <EditorToolbar onDelete={handleDelete} />
+            <EditorToolbar onDelete={handleDelete} documentId={id} />
             
             {/* Editor content */}
             <div className="flex-1 flex flex-col overflow-y-auto min-h-0">
