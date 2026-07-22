@@ -480,3 +480,134 @@ collaborative-editor/
         └── persistence/
             └── fileStorage.js         ← Binary snapshot read/write
 ```
+
+
+---
+
+## 7. RAG-Based Summarization & Q&A
+
+### 7.1 Overview
+
+DocWise includes a document summarization and question-answering feature powered by
+Retrieval-Augmented Generation (RAG). This is implemented as a **standalone Python
+microservice** (`rag-service/`), kept fully separate from the core Express/React
+collaborative-editing stack described in sections 1-6. The Express server proxies requests
+to this service; the two communicate over a simple internal HTTP API.
+
+### 7.2 Why a Separate Service
+
+- Keeps the core real-time collaboration engine (Yjs/Socket.IO) completely untouched and
+  independently testable
+- Python has first-class support for the LLM/embedding/vector-store libraries used here
+  (LangChain, ChromaDB), which would be awkward to replicate in Node
+- Allows the RAG service to be developed, tested, and even scaled independently of the
+  main app
+
+### 7.3 Architecture
+
+```
+┌──────────────────────────┐      ┌──────────────────────────┐      ┌──────────────┐
+│   React Client (5173)    │      │  Express Server (4000)   │      │  RAG Service │
+│                          │ HTTP │                          │ HTTP │  (Python,    │
+│  EditorToolbar.jsx       │─────►│  /api/documents/:id/     │─────►│  FastAPI,    │
+│  - Summarize button      │      │    summarize             │      │  port 8001)  │
+│  - Ask AI button         │      │  /api/documents/:id/qna  │      │              │
+│                          │◄─────│                          │◄─────│              │
+└──────────────────────────┘      └──────────────────────────┘      └──────┬───────┘
+                                                                            │
+                                                              ┌─────────────┼─────────────┐
+                                                              │             │             │
+                                                        ┌─────▼────┐  ┌─────▼─────┐  ┌────▼────┐
+                                                        │ ChromaDB │  │  Gemini   │  │  Gemini │
+                                                        │ (local   │  │ Embeddings│  │  Chat   │
+                                                        │  vector  │  │  API      │  │  Model  │
+                                                        │  store)  │  │           │  │  API    │
+                                                        └──────────┘  └───────────┘  └─────────┘
+```
+
+### 7.4 RAG Service — Tech Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| API framework | FastAPI + Uvicorn | HTTP service, request validation |
+| LLM orchestration | LangChain | Text splitting, embedding/chat model wrappers |
+| Embeddings | Google Gemini (`gemini-embedding-001`) | Converts text chunks to 768-dim vectors |
+| Chat/generation | Google Gemini (`gemini-flash-latest`) | Summarization and grounded answer generation |
+| Vector store | ChromaDB (local, persisted to `rag-service/chroma_db/`) | Stores and retrieves chunk embeddings per document |
+| Text splitting | LangChain `RecursiveCharacterTextSplitter` | Chunks document text (500 chars, 50 overlap) |
+
+### 7.5 Endpoints
+
+**File:** `rag-service/main.py`
+**Port:** `8001`
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Health check |
+| `POST` | `/index` | Chunks + embeds a document's text, stores in Chroma |
+| `POST` | `/summarize` | Sends full document text to Gemini, returns a 3-5 sentence summary |
+| `POST` | `/qna` | Retrieves top-4 relevant chunks for a question, asks Gemini to answer using only that context |
+
+All three POST endpoints fail loudly (clear error JSON) if the Gemini API key is missing or
+a call fails — there is intentionally no fallback to fake/stub data, since a silent fallback
+would make the feature look functional when it wasn't actually calling a real model.
+
+### 7.6 Ingestion Pipeline (`/index`)
+
+1. Document text is split into ~500-character chunks (50-character overlap, to preserve
+   context across chunk boundaries)
+2. Each chunk is embedded via Gemini's embedding model, explicitly pinned to 768 dimensions
+   (the model's native output is 3072-dim; pinning keeps it compatible with the existing
+   Chroma collection schema)
+3. Chunks + embeddings + metadata (`document_id`, `chunk_index`) are stored in a local,
+   persistent ChromaDB collection
+
+### 7.7 Retrieval-Grounded Q&A (`/qna`)
+
+Given a `document_id` and a `question`:
+1. The document is (re-)indexed to ensure it's up to date
+2. The question is embedded and compared against stored chunk embeddings for that document
+3. The top 4 most relevant chunks are retrieved
+4. Gemini is prompted to answer **using only the retrieved chunks** as context, with an
+   explicit instruction to respond "I don't have enough information" if the answer isn't
+   contained in them
+
+This last point was specifically tested: asking a question unrelated to the document's
+content (e.g. a general-knowledge question) correctly returns the "don't know" response
+rather than a hallucinated answer — confirming the retrieval step is actually constraining
+the model's output, not just decorating a normal LLM call.
+
+### 7.8 Express Integration
+
+**File:** `server/src/index.js`
+
+Two routes proxy to the RAG service, reusing the existing `documentManager.getText()` call
+already used elsewhere in the server to fetch a document's current persisted content:
+
+| Method | Endpoint | Behavior |
+|---|---|---|
+| `POST` | `/api/documents/:id/summarize` | Fetches document text, forwards to RAG service `/summarize`, returns the result |
+| `POST` | `/api/documents/:id/qna` | Fetches document text + question, forwards to RAG service `/qna`, returns the result |
+
+Both return `502` if the RAG service responds with an error, and `500` if it's unreachable
+entirely (rather than crashing the Express process).
+
+### 7.9 Client UI
+
+**File:** `client/src/components/editor/EditorToolbar.jsx`
+
+Two new toolbar buttons, each opening a modal:
+- **Summarize** — calls the summarize endpoint immediately on click, shows a loading state,
+  then displays the returned summary
+- **Ask AI** — opens a text input for a question; on submit, calls the Q&A endpoint and
+  displays the answer along with the number of source chunks used
+
+### 7.10 Known Limitations
+
+- The RAG service's Gemini API key is on the free tier, which has rate limits — heavy
+  concurrent use would need a paid tier or request queuing
+- Document indexing currently happens on every `/qna` call rather than being cached/skipped
+  if unchanged; acceptable for the current scale, worth revisiting for larger documents or
+  higher traffic
+- The vector store is local to the machine running the RAG service (not shared/networked) —
+  fine for development, would need a hosted vector DB for multi-instance deployment
